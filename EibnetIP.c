@@ -195,7 +195,7 @@ void sendConnectionStateRequest(struct netconn *newconn) {
 void sendConnectRequest(struct netconn *newconn) {
 	struct netbuf * netbuf;
 	netbuf = netbuf_new();
-	//uint8_t len = 6 + 2 * sizeof(EIBNETIP_HPAI) + sizeof(EIBNETIP_CRI_CRD); //
+
 	uint8_t buf[6 + 2 * sizeof(EIBNETIP_HPAI) + sizeof(EIBNETIP_CRI_CRD)];
 	netbuf_ref(netbuf, buf, 6 + 2 * sizeof(EIBNETIP_HPAI) + sizeof(EIBNETIP_CRI_CRD));
 	EIBNETIP_PACKET* request=(EIBNETIP_PACKET*) buf;
@@ -203,12 +203,6 @@ void sendConnectRequest(struct netconn *newconn) {
 	request->head.version=0x10;
 	request->head.servicetype=ntohs(KNX_ST_CONNECT_REQUEST);
 	request->head.totalsize=ntohs(6 + 2 * sizeof(EIBNETIP_HPAI) + sizeof(EIBNETIP_CRI_CRD));
-	/*knx_ip_pkt_t *knx_pkt = (knx_ip_pkt_t *) buf;
-	knx_pkt->header_len = 0x06;
-	knx_pkt->protocol_version = 0x10;
-	knx_pkt->service_type = ntohs(KNX_ST_CONNECT_REQUEST);
-	knx_pkt->total_len.len = ntohs(6 + 2 * sizeof(EIBNETIP_HPAI) + sizeof(EIBNETIP_CRI_CRD));*/
-//pk->data
 	EIBNETIP_HPAI *hpaiCtrl = (EIBNETIP_HPAI *) ((uint8_t *) request->data);
 	hpaiCtrl->structlength = sizeof(EIBNETIP_HPAI);
 	hpaiCtrl->hostprotocol = 0x01;
@@ -264,10 +258,6 @@ void sendDataTask() {
 	request->head.headersize=0x06;
 	request->head.version=0x10;
 	request->head.servicetype=ntohs(KNX_ST_TUNNELING_REQUEST);
-	/*knx_ip_pkt_t *knx_pkt = (knx_ip_pkt_t *) buf;
-	knx_pkt->header_len = 0x06;
-	knx_pkt->protocol_version = 0x10;
-	knx_pkt->service_type = ntohs(KNX_ST_TUNNELING_REQUEST);*/
 	EIBNETIP_COMMON_CONNECTION_HEADER* cch =(EIBNETIP_COMMON_CONNECTION_HEADER *) ((uint8_t *) buf + 6);
 	cch->structlength = 0x04;
 	cch->typespecific = 0;
@@ -296,7 +286,7 @@ void sendDataTask() {
 			netbuf = netbuf_new();
 			uint16_t len = 6 + 4 + 10 + packet->len; // knx_pkt + cemi_msg + cemi_service + data + checksum
 			request->head.totalsize=ntohs(len);
-			//knx_pkt->total_len.len = ntohs(len);
+
 			cemi_data->destination.value = ntohs(packet->target.value);
 			netbuf_ref(netbuf, buf, len);
 			cch->channelid = channelid;
@@ -343,8 +333,6 @@ void EibnetIPCtrlSock() {
 	if (err != ERR_OK) {
 		printf("Binding for CtrlSock failed %d!!\n", err);
 	}
-	//writeQ = xQueueCreate(15, sizeof(datapacket_t*));
-	//readQ = xQueueCreate(15, sizeof(datapacket_t*));
 
 	netconn_connect(ctrlconn, &rmip, rmport);
 	netconn_set_recvtimeout(ctrlconn, 10);
@@ -396,7 +384,7 @@ void EibnetIPCtrlSock() {
 }
 
 void EibnetIPDataSock() {
-	//knx_ip_pkt_t *knx_pkt;
+
 	sendQ = xQueueCreate(15, sizeof(datapacket_t*));
 	recvQ = xQueueCreate(15, sizeof(datapacket_t*));
 	EIBNETIP_PACKET* received_packet;
@@ -409,7 +397,7 @@ void EibnetIPDataSock() {
 	netconn_connect(dataconn, &rmip, rmport);
 	struct netbuf *inbuf;
 	char *pBuffer;
-	//EIBNETIP_PACKET* received_packet;
+
 	u16_t buflen;
 	netconn_set_recvtimeout(dataconn, 10);
 	xTaskCreate(&sendDataTask, "sendTask", 2048, NULL, 5, &sendTask);
@@ -419,14 +407,11 @@ void EibnetIPDataSock() {
 		if (err == ERR_OK) {
 			netbuf_data(inbuf, (void**) &pBuffer, &buflen);
 			received_packet = (EIBNETIP_PACKET *) pBuffer;
-			//printf("Service type 0x%x \n",htons(received_packet->head.servicetype));
-			//switch (htons(received_packet->head.servicetype)) {
-			//switch (htons(knx_pkt->service_type)){
+
 			switch (htons(received_packet->head.servicetype)){
 			case (KNX_ST_TUNNELING_REQUEST):
 				//printf("Got tunneling request:");
-				//knx_pkt = (knx_ip_pkt_t *) pBuffer;
-				//ESP_LOGI(TAG, "Service type is %x",htons(knx_pkt->service_type));
+
 				cch = (EIBNETIP_COMMON_CONNECTION_HEADER *) received_packet->data;
 				cemi_msg_t *cemi_msg = (cemi_msg_t *) ((received_packet->data) + 4);
 				cemi_service_t *cemi_data = &cemi_msg->data.service_information;
@@ -436,10 +421,10 @@ void EibnetIPDataSock() {
 				if (cch->channelid == channelid) {
 					sendTunnelingAck(dataconn, cch->channelid,cch->sequencecounter, 0);
 						knx_command_type_t ct = (knx_command_type_t) (((cemi_data->data[0]& 0xC0) >> 6)	| ((cemi_data->pci.apci & 0x03) << 2));
-						//for(int i=0;i<8;i++){
+
 							if(cemi_msg->message_code==L_DATA_ind&&cemi_data->source.value != ntohs(OWNADD)){
 								//printf("Message code is %x\n",cemi_msg->message_code);
-								//if(cemi_data->source.value == ntohs(0x66)){//printf("Ooops, it's me\n!!");}else{
+
 								switch (ct) {
 								case KNX_CT_READ: //Read
 									printf("Ask for value of %s\n",	GAasString(htons(cemi_data->destination.value)));
@@ -465,7 +450,7 @@ void EibnetIPDataSock() {
 								}
 
 							}
-						//}
+
 
 				} else {
 					printf("Wrong channel id %d!Should be %d\n",cch->channelid,channelid);
@@ -476,7 +461,7 @@ void EibnetIPDataSock() {
 				break;
 
 			case (KNX_ST_TUNNELING_ACK):
-				//knx_pkt = (knx_ip_pkt_t *) pBuffer;
+
 				cch =(EIBNETIP_COMMON_CONNECTION_HEADER *) received_packet->data;
 				//printf("Got ack for seq# %d\n", cch->sequencecounter);
 				xTaskNotify(sendTask, cch->sequencecounter,eSetValueWithOverwrite);
